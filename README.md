@@ -26,15 +26,11 @@ Usage
 
 Clone the repository and run the R Markdown file to replicate the analysis. Ensure all necessary libraries are installed.
 
-bash
-Kodu kopyala
 git clone https://github.com/yourusername/LondonSubregionDataAnalysis.git
+
 Open the LondonSubregionDataAnalysis.Rmd file in RStudio and knit the document to generate the analysis report.
 
 Contributing
 
 Contributions are welcome! Please fork the repository and submit a pull request with your changes.
 
-License
-
-This project is licensed under the MIT License.
