@@ -1,0 +1,414 @@
+---
+title: "Data Science and Big Data Analytics coursework"
+output: html_document
+---
+
+```{=html}
+<style>
+  h1 {
+    font-size: 70px;
+    color: darkblue;
+  }
+  h2 {
+    font-size: 70px;
+    color: darkgreen;
+  }
+  h3 {
+    font-size: 70px;
+    color: darkred;
+  }
+  p {
+    font-size: 18px;
+  }
+  .highlight {
+    background-color: #ffffcc;
+    padding: 5px;
+    border-radius: 5px;
+  }
+  .discussion {
+    font-size: 20px;
+    color: darkslategray;
+  }
+    .larger-text {
+    font-size: 300%; /* This makes the font size 1.5 times larger */
+    color: darkgreen;
+  }
+</style>
+```
+### INTRODUCTION
+
+[In this coursework, I consider various socio-economic and demographic factors to understand their impact on median house prices in various subregions across Greater London. I use data from the 2011 census that contains records for 983 subregions with variables like population density, percentage of people aged between 15-64 years, percentage of lone-parent households, and many other variables relating to these subregions.]{style="color: darkred"}
+
+[I am going to use these variables in a regression model for predicting median house prices. Another way of thinking about this is that I want to construct a model whereby the critical drivers of house prices can be identified, and through that information, policymakers and city planners can design better policies.]{style="color: darkred"}
+
+[Lets start with loading the data and perform correlation matrix!]{style="color: darkred"}
+
+### Load the data
+
+```{r}
+# Install necessary packages outside the script
+# install.packages(c("readxl", "dplyr", "ggplot2", "broom", "car", "lmtest", "MASS","corrplot"))
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(broom)
+library(car)
+library(lmtest)
+library(MASS)
+library(corrplot)
+
+# install.packages("corrplot")
+
+library(readxl)
+library(dplyr)
+library(ggplot2)
+library(corrplot)
+
+file_path <- "/Users/berdn90s/Downloads/LondonData.xlsx"
+data <- read_excel(file_path)
+
+# Convert 'Political' to a factor with numerical levels
+data$Political_Factor <- as.numeric(factor(data$Political))
+
+print(colnames(data))
+
+numerical_columns <- c("Median_HP", "Pop_Density", "Aged_15to64", "LoneParent_HH", "BAME", 
+                       "Rented", "NoWork_Families", "Low_BirthWeight", "Male_LE", "Political_Factor")
+
+numerical_data <- data[, numerical_columns]
+
+correlation_matrix <- cor(numerical_data, use = "complete.obs")
+
+print(correlation_matrix)
+
+corrplot(correlation_matrix, method = "color", type = "upper", 
+         tl.col = "black", tl.srt = 45, 
+         addCoef.col = "black", number.cex = 0.7)
+
+
+```
+
+### Observer the first few rows of the data
+
+```{r}
+head(data)
+```
+
+[EXPLORATORY DATA ANALYSIS]{style="color: darkblue; font-size: 30px"}
+
+[1st Analysis]{style="font-size: 26px; color: darkgreen;"}
+
+```{r}
+# Calculate the correlation coefficient
+cor_lp_nwf <- cor(data$LoneParent_HH, data$NoWork_Families)
+print(paste("Correlation between LoneParent_HH and NoWork_Families: ", cor_lp_nwf))
+
+```
+
+```{r}
+# Split the data into two groups based on the median of LoneParent_HH
+median_lphh <- median(data$LoneParent_HH, na.rm = TRUE)
+high_lphh <- data[data$LoneParent_HH > median_lphh, ]
+low_lphh <- data[data$LoneParent_HH <= median_lphh, ]
+
+# Perform t-test
+t_test_result <- t.test(high_lphh$NoWork_Families, low_lphh$NoWork_Families)
+
+# Print t-test results
+print(t_test_result)
+```
+
+[Plot: Boxplot of LoneParent_HH by Pop_Density_Group]{style="color: darkred;"}
+
+```{r}
+# Create a scatter plot}
+ggplot(data, aes(x = LoneParent_HH, y = NoWork_Families)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Scatter Plot of LoneParent_HH vs NoWork_Families",
+       x = "Lone Parent Households (%)",
+       y = "No Work Families (%)") +
+  theme_minimal()
+```
+
+[DISCUSSION:]{style="color: darkblue;"}
+
+::: {.discussion .highlight}
+According to the scatter plot, more than 90% of NoWork_Families and LoneParent_HH have a strong positive correlation. In this case, many places with lone parent households tend to have more families without jobs members. The scatter plot confirms this by showing that as the percentage of lone-parent households goes up, so does the percentage of families with no working members. This strong correlation points out that single-parent homes in London may encounter difficulties related to employment opportunities and access to childcare facilities.
+
+To reinforce this conclusion, Welch Two Sample t-test statistics were used. T-test yields a t-value of 34.21, with a p-value less than 2.2e-16 meaning that there is statistically significant difference in the mean percentages of NoWork_Families between high and low percentages of LoneParent_HH ones. Specifically, areas with high percentages of lone-parent households have an average of 8.11% NoWork_Families compared to those about lone-parent households having only 3.34%. Such differences highlight the need for targeted policy measures as they show the rippling effects on women-headed families thereby necessitating formulation of gender specific policies like the one proposed by Tronto (2010). Such policies could include affordable childcare, job training, and educational opportunities, aimed at supporting lone parents in gaining employment and thus reducing family joblessness, ultimately fostering economic stability and growth in these communities.
+:::
+
+[2nd Analysis]{style="font-size: 26px; color: darkgreen;"}
+
+[Define high and low BAME based on median]{style="color: darkred;"}
+
+```{r}
+median_bame <- median(data$BAME, na.rm = TRUE)
+data <- data %>%
+  mutate(BAME_Group = ifelse(BAME >= median_bame, "High BAME", "Low BAME"))
+```
+
+[Numerical calculation]{style="color: darkred;"}
+
+```{r}
+mean_no_work_high_bame <- mean(data$NoWork_Families[data$BAME_Group == "High BAME"], na.rm = TRUE)
+mean_no_work_low_bame <- mean(data$NoWork_Families[data$BAME_Group == "Low BAME"], na.rm = TRUE)
+```
+
+[Plot]{style="color: darkred"}
+
+```{r}
+ggplot(data, aes(x = BAME_Group, y = NoWork_Families, fill = BAME_Group)) +
+  geom_violin(trim = FALSE) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "No Work Families by BAME Group",
+       x = "BAME Group",
+       y = "Percentage of No Work Families") +
+  theme(legend.position = "none")
+
+
+```
+
+[Perform an independent t-test]{style="color: darkred"} [Print the t-test result]{style="color: darkred"}
+
+```{r}
+t_test_bame <- t.test(NoWork_Families ~ BAME_Group, data = data)
+print(t_test_bame)
+```
+
+[DISCUSSION:]{style="color: darkblue;"}
+
+::: {.discussion .highlight}
+For this exploratory analysis, these two variables would be great fit: BAME and NoWork_Families. The correlation of 0.60 is high enough to guarantee meaningful relationships.
+
+The analysis considers the relationship between percentage with no working adults in the family and the BAME group classification in Greater London. The BAME variable was split at the median value, whereby there were two categories: High BAME versus Low BAME. This allows the identification of whether there are essential differences in the percentage with no working within areas defined as having higher and lower BAME populations.
+
+The findings indicate that the high BAME areas on average have a higher percentage of no-work families at 9.57 percent compared to low BAME equivalents at 7.43 percent. Again, from the violin plot, one can notice that for no-work families, there is a broader distribution with more concentration within the High BAME group. These differences are further confirmed by individual data points.
+
+Hence, there are various socio-economic factors that could explain this higher percentage of no-work families when considering areas with high BAME. This would include the limited chances of finding employment but also systemic biases within the labor market itself. It ultimately means that such programmes of employment and social support have to be specifically located in areas with larger representations of BAME.
+
+Some of the successful policies from high BAME concentrated areas can be counted as including job training programs, easier access to education, and less discrimination at the workplace. These policies, therefore, address the needs of bringing down no-work families, reduce poverty, and have the effect of promoting economic inclusivity.
+
+This overview finds high inequalities in the percentage of no-work families between high and low BAME areas in Greater London. Special support and policy interventions would be needed to fill up these gaps, placing employment rates and socio-economic well-being in their respective high-BAME communities on better footings. Further analysis with variables like education and local economic conditions added would throw weight upon the development of better support strategies for such families.
+:::
+
+[3rd Analysis]{style="font-size: 26px; color: darkgreen;"}
+
+```{r}
+
+
+# Calculate the correlation coefficient
+cor_lbw_nwf <- cor(data$Low_BirthWeight, data$NoWork_Families, use = "complete.obs")
+print(paste("Correlation between Low_BirthWeight and NoWork_Families: ", cor_lbw_nwf))
+
+# Create a scatter plot
+ggplot(data, aes(x = Low_BirthWeight, y = NoWork_Families)) +
+  geom_point(alpha = 0.7) +
+  labs(title = "Scatter Plot of Low_BirthWeight vs NoWork_Families",
+       x = "Low Birth Weight (%)",
+       y = "No Work Families (%)") +
+  theme_minimal()
+
+# Split the data into two groups based on the median of Low_BirthWeight
+median_lbw <- median(data$Low_BirthWeight, na.rm = TRUE)
+high_lbw <- data[data$Low_BirthWeight > median_lbw, ]
+low_lbw <- data[data$Low_BirthWeight <= median_lbw, ]
+
+# Perform t-test
+t_test_lbw_nwf <- t.test(high_lbw$NoWork_Families, low_lbw$NoWork_Families)
+
+# Print t-test results
+print(t_test_lbw_nwf)
+
+```
+
+[DISCUSSION:]{style="color: darkblue;"}
+
+::: {.discussion .highlight}
+:::
+
+[Regression Analysis]{style="color: darkblue; font-size: 30px"}
+
+[Here is my STEP-BY-STEP plan:
+
+1-) I am going to load and display the data in order to perform basic operations to understand the variables
+
+2-)I am going to handle missing data if any, encode categorical variables.
+
+\-)Here is the time for create initial model. I am going to build initial regression model using individual predictors in order to gain insights about their relationship with "Median_HP".
+
+4-)After that I have to select model. I am going to use stepwise selection in order to find best model.
+
+5-)I will evaluate the model using diagnostics plots and statistical metrics.
+
+6-)I will discuss the resulst.]{style= "color: darkblue"}
+
+```{r}
+#STEP 1  Load necessary libraries
+# Load necessary libraries
+library(readxl)
+library(dplyr)
+library(MASS) 
+library(tidyr)
+# Load the data from the Excel file
+file_path <- "/Users/berdn90s/Downloads/LondonData.xlsx"
+data <- read_excel(file_path)
+
+head(data)
+
+ggplot(data, aes(x = reorder(Borough, Median_HP), y = Median_HP)) +
+  geom_bar(stat = "identity", fill = "red", color = "black", alpha = 0.7) +
+  coord_flip() +
+  ggtitle("Median House Prices by Borough") +
+  xlab("Borough") +
+  ylab("Median House Price (£)") +
+  theme_minimal()
+
+```
+
+```{r}
+#STEP 2  Data Processing
+
+summary(data)
+
+data <- data %>% drop_na()  
+
+# Encode categorical variables
+data$Inner <- as.factor(data$Inner)
+data$Borough <- as.factor(data$Borough)
+data$Area <- as.factor(data$Area)
+data$Political <- as.factor(data$Political)
+
+str(data)
+
+
+```
+
+```{r}
+#STEP 3 Polynomial Terms Creation
+
+
+# Define a function to create polynomial terms for numeric predictors
+# I got help when I am creating this function from ChatGPT. I tried and could not make it due to the complexity of the idea. 
+create_polynomial_terms <- function(data, numeric_predictors, degree = 2) {
+  poly_data <- data
+  for (pred in numeric_predictors) {
+    for (d in 2:degree) {
+      poly_data[[paste0(pred, "_poly", d)]] <- data[[pred]]^d
+    }
+  }
+  return(poly_data)
+}
+numeric_predictors <- sapply(data, is.numeric)
+numeric_predictors <- names(numeric_predictors[numeric_predictors])
+
+# Create polynomial terms up to the 2nd degree for simplicity
+data_poly <- create_polynomial_terms(data, numeric_predictors, degree = 2)
+
+str(data_poly)
+
+
+
+
+
+```
+
+```{r}
+#STEP 4 Model Building
+
+
+full_formula <- as.formula(paste("Median_HP ~", paste(setdiff(names(data_poly), c("Median_HP", "MSOA")), collapse = " + ")))
+full_model <- lm(full_formula, data = data_poly)
+best_model <- stepAIC(full_model, direction = "both")
+
+summary(best_model)
+
+```
+
+```{r}
+#STEP 4Model Summary and Diagnostics
+par(mfrow = c(2, 2))
+plot(best_model)
+
+```
+
+```{r}
+library(glmnet)
+library(caret)
+
+x <- model.matrix(Median_HP ~ . - 1, data = data_poly)  # -1 to remove intercept from model.matrix
+y <- data_poly$Median_HP
+
+# Define the control using a 10-fold cross-validation
+train_control <- trainControl(method = "cv", number = 10)
+
+# Train the model using Ridge Regression (alpha = 0)
+model_ridge <- train(
+  x, y,
+  method = "glmnet",
+  trControl = train_control,
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.001, 0.1, by = 0.001))
+)
+
+print(model_ridge)
+
+```
+
+[REGRESSION ANALYSIS DISCUSSION]{style="color : darkblue;font-size: 26px;"}
+
+[Data Preparation:]{style="color : darkblue;font-size: 16px;"}
+
+This paper presents an analysis where I will take out a regression to predict the Median house price (Median_HP) in London Sub-Regions on the basis of different socio-economic and demographic variables. Here, the discussion will follow up on the necessary steps, the decisions taken, and the insights drawn.
+
+First, I read in the LondonData.xlsx data set, removing any missing values with drop_na(). This is a crucial first step in any analysis where missing data may change the results significantly. Then, the inner, borough, area, and political variables were encoded as categorical variables to note their roles for later inclusion into our regression models. Also, I inspect the data with some aspects for example I think Borough might give me a valuable insights about Median_HP and I create a plot.
+
+[Generating Terms of Polynomials:]{style="color : darkblue;font-size: 16px;"}
+
+I generate polynomial conditions for the numeral forecaster to capture the possible non-linear associations in the data. The polynomial requirements enable the model to adapt the curve to facts rather than a straight line, which is particularly helpful when dealing with complex, real world statistics that are likely to show non-linear trends. Furthermore, I think that if I add polynomial terms it will help the model capture the curvature in the relationship between predictors and the response variable, results in a better predictions
+
+[Building the Full Model:]{style="color : darkblue;font-size: 16px;"}
+
+I formulated a complete model in which all predictors and their polynomial terms were contained. This full model generally provides the best possible fit before variable selection is conducted. It was the step-by-step procedure starting with a complete model, iteratively testing models with and without predictors to reduce the AIC value as low as possible. It meant a better model with less complexity would produce a lower AIC. This reached a final stage with some predictors: Borough, Aged_15to64, LoneParent_HH, Low_BirthWeight, Male_LE, and some polynomial terms. Why do I choose stepvise selection method? I used stepwise selection to add or delete factors based on their statistical significance in order to find the optimum model. Stepwise selection balances model complexity and predictive accuracy by deleting variables that make no meaningful contribution to the model, hence preventing overfitting. Overfitting happens when a model is overly complicated, capturing noise rather than the underlying pattern, leading to poor performance on new data.
+
+[Model Summary]{style="color : darkblue;font-size: 19px;"}
+
+[Interpreting the Best Model]{style="color : darkblue;font-size: 16px;"}
+
+One of the most noticeable results for the greatest model is its high R square value of 0.9287, signifying the extent to which median home prices may be explained by it, that is 92.87%. Its summary is rich in information on major variables and how they influence median house prices. Major determinants include various neighborhoods, economic factors such as single parent households’ ratio and health factors like the average lifespan of men.
+
+[Model Diagnostics:]{style="color : darkgreen;font-size: 13px;"} Then I evaluated the best model using diagnostic plots to check violation of regression assumptions. Some of these plots included:
+
+[Residuals vs fitted:]{style="color : darkgreen;font-size: 13px;"} Checking for the presence of non-linearity.
+
+[Q-Q Plot:]{style="color : darkgreen;font-size: 13;"} This graphical technique is utilized to check the normality of residuals.Its points lineon the 45-degree line, means that the residuals are normally distributed.
+
+[Scale-Location Plot:]{style="color : darkgreen;font-size: 13px;"} Testing for Homoscedasticity. It shows a constant spread of residuals, confirming homoscedasticity.
+
+[Residuals versus Leverage:]{style="color : darkgreen;font-size: 13px;"} This plot is used to show the influential data points.
+
+Cross-validation results showed very stable values of RMSE and, in turn, an indication of the model stability for different values of lambda.
+
+My best model after stepwise selection involves only a few predictors, including:
+
+1.  Borough: A few of the coefficients for some of the boroughs are significant, so there is a great deal of difference between different median house prices.
+
+2.  Aged_15to64: The percentage of those aged 15-64 negatively affects house prices.
+
+3.  LoneParent_HH: This variable reflects areas with higher numbers of lone-parent households, which suggest less secure economic backgrounds and thus decreased house prices.
+
+4.  Male_LE: This factor seems to have positive significance for house prices, probably indicating better living conditions and health care as compared to the female population.
+
+The reason behind median house prices across Greater London: I took a principled and methodological approach when developing a regression model for explaining such. Having high explanatory power in this model and its diagnostic validation have put us in the belief that it's going to be robust and insightful. It's highly relevant information for policymakers and urban planners alike.
+
+[Overfitting check]{style="color : darkblue;font-size: 16px;"}
+
+To ascertain that model is not overfitting the R square value can be compared with adjusted R square. The model explains 92.87% of variability in median house prices as indicated by an R square of 0.9287. The adjusted R square is 0.9256, which corrects for predictors in the model. A slight difference between the R square and adjusted R square values (0.0031) implies no overfitting of the model and that its complexity adequately reflects the data.
+
+[Interpretation:]{style="color : darkblue;font-size: 26px;"}
+
+The best regression model suggests that several predictors are significant in influencing median house prices within Greater London. These include Borough, Percent Population Aged 15-64, Percent Lone Parent Households, and Male Life Expectancy. The model accounts for much of the variation in house prices with a high R-square value of 0.9287. It also finds support in its adjusted R square value of 0.9256, which tells that the model is not overfitting, as the performance stays strong even when the number of predictors is taken into account.
+
+Moreover, the polynomials in variables alone-parent household percentage and male life expectancy—center on a nonlinearity aspect of human relationships. The polynomial terms significantly improve the fitting performance of this model with high explanatory power.
+
+The average house prices, on average, stretch up to high costs in relation to others in some boroughs like Camden and Kensington. It can therefore be noticed that low house values are always associated with a higher percentage of persons between the ages of 15-64 years or percent lone parent households, reflecting their kind of socio-economic challenges they face. On the other hand, an increased men's life expectancy results in increased real estate costs, which is a pointer of improved living conditions.
