@@ -26,7 +26,7 @@ Usage
 
 Clone the repository and run the R Markdown file to replicate the analysis. Ensure all necessary libraries are installed.
 
-git clone https://github.com/yourusername/LondonSubregionDataAnalysis.git
+git clone https://github.com/berdn70s/LondonSubregionDataAnalysis.git
 
 Open the LondonSubregionDataAnalysis.Rmd file in RStudio and knit the document to generate the analysis report.
 
